@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:jaspr/dom.dart';
 import 'package:jaspr/jaspr.dart';
+import 'package:universal_web/web.dart' as web;
 
 class BranchInfo {
   BranchInfo(this.name, this.compareUrl);
@@ -23,6 +24,21 @@ class HomeState extends State<Home> {
   String status = '';
   List<BranchInfo> matchingBranches = [];
   DateTime? lastCheckTime;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      try {
+        final uri = Uri.parse(web.window.location.href);
+        // Support ?issue=12345 or ?id=12345 in the URL
+        final param = uri.queryParameters['issue'] ?? uri.queryParameters['id'];
+        if (param != null && param.isNotEmpty) {
+          issueId = param;
+        }
+      } catch (_) {}
+    }
+  }
 
   Future<void> checkIssue() async {
     final cleanId = issueId.trim().replaceAll('#', '');
@@ -146,27 +162,38 @@ class HomeState extends State<Home> {
         h1(classes: 'title', [.text('Triage Verifier')]),
         p(classes: 'subtitle', [.text('Check if a GitHub issue has been triaged in mboetger/flutter')]),
       ]),
-      div(classes: 'form-group', [
-        div(classes: 'input-wrapper', [
-          input<String>(
-            type: .text,
-            value: issueId,
-            onInput: (val) {
-              setState(() => issueId = val);
-            },
-            classes: 'issue-input',
-            attributes: {'placeholder': 'Enter GitHub Issue ID (e.g. 12345)'},
+      form(
+        classes: 'form-group',
+        events: {
+          'submit': (web.Event event) {
+            event.preventDefault();
+            if (!isLoading && issueId.trim().isNotEmpty) {
+              checkIssue();
+            }
+          }
+        },
+        [
+          div(classes: 'input-wrapper', [
+            input<String>(
+              type: .text,
+              value: issueId,
+              onInput: (val) {
+                setState(() => issueId = val);
+              },
+              classes: 'issue-input',
+              attributes: {'placeholder': 'Enter GitHub Issue ID (e.g. 12345)'},
+            ),
+          ]),
+          button(
+            type: .submit,
+            disabled: isLoading || issueId.trim().isEmpty,
+            classes: 'check-button',
+            [
+              .text(isLoading ? 'Verifying...' : 'Verify Triage Status'),
+            ],
           ),
-        ]),
-        button(
-          disabled: isLoading || issueId.trim().isEmpty,
-          onClick: (isLoading || issueId.trim().isEmpty) ? null : checkIssue,
-          classes: 'check-button',
-          [
-            .text(isLoading ? 'Verifying...' : 'Verify Triage Status'),
-          ],
-        ),
-      ]),
+        ],
+      ),
       if (isLoading)
         div(classes: 'loading-container', [
           div(classes: 'spinner', []),
