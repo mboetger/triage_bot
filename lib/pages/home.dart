@@ -18,6 +18,7 @@ class Home extends StatefulComponent {
 
 class HomeState extends State<Home> {
   String issueId = '';
+  String searchedIssueId = '';
   bool isLoading = false;
   String status = '';
   List<BranchInfo> matchingBranches = [];
@@ -38,6 +39,7 @@ class HomeState extends State<Home> {
       isLoading = true;
       status = '';
       matchingBranches = [];
+      searchedIssueId = cleanId;
     });
 
     try {
@@ -247,7 +249,7 @@ class HomeState extends State<Home> {
             ]),
             div(classes: 'result-content', [
               h3(classes: 'result-title', [.text('Not triaged')]),
-              p(classes: 'result-desc', [.text('No branch starting with "triage-issue-${issueId.trim().replaceAll('#', '')}" was found in mboetger/flutter.')]),
+              p(classes: 'result-desc', [.text('No branch starting with "triage-issue-$searchedIssueId" was found in mboetger/flutter.')]),
             ]),
           ]),
         ])
