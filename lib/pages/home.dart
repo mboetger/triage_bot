@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:jaspr/dom.dart';
 import 'package:jaspr/jaspr.dart';
-import 'package:universal_web/web.dart' as web;
 
 class BranchInfo {
   BranchInfo(this.name, this.compareUrl);
@@ -80,11 +79,6 @@ class HomeState extends State<Home> {
             status = 'Found';
             matchingBranches = branchInfos;
           });
-
-          // If exactly one branch is found, automatically direct them to the compare page
-          if (branchInfos.length == 1 && kIsWeb) {
-            web.window.location.href = branchInfos.first.compareUrl;
-          }
         } else {
           setState(() {
             isLoading = false;
@@ -178,9 +172,7 @@ class HomeState extends State<Home> {
               div(classes: 'result-content', [
                 h3(classes: 'result-title', [.text(branch.name)]),
                 p(classes: 'result-desc', [
-                  .text(matchingBranches.length == 1
-                      ? 'Branch found! Directing you to the compare page...'
-                      : 'Branch found! Click below to view the commit comparison.')
+                  .text('Branch found! Click below to view the commit comparison.')
                 ]),
                 a(
                   href: branch.compareUrl,

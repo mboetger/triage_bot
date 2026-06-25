@@ -6,7 +6,7 @@ A high-performance, single-page Jaspr web application designed to instantly veri
 
 - **Dynamic Branch Resolution**: Instantly queries the GitHub Git database (`matching-refs` API) to find all branches starting with `triage-issue-<ISSUE_ID>` (such as `triage-issue-123`, `triage-issue-123-2`, etc.).
 - **Drift-Free Commit Comparison**: Calculates the exact merge base commit SHA against upstream `flutter/flutter:master` to prevent branch drift from stale fork branches. It generates a pristine compare page (`<base_sha>...<branch>`) displaying only the commits added to the triage branch.
-- **Smart Navigation**: Automatically directs the browser to the comparison page when exactly one branch is found. When multiple branches match, it presents a clean stack of result cards for easy selection.
+- **Explicit Navigation**: Displays beautiful result cards with direct links to launch the pristine commit comparison page in a new window (`target="_blank"`).
 - **Premium Aesthetics**: Built with a rich, glassmorphic dark mode UI, smooth gradient accents, micro-animations, and modern typography (`Outfit` and `Inter` from Google Fonts).
 
 ## Running the Project
