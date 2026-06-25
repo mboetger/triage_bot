@@ -21,10 +21,18 @@ class HomeState extends State<Home> {
   bool isLoading = false;
   String status = '';
   List<BranchInfo> matchingBranches = [];
+  DateTime? lastCheckTime;
 
   Future<void> checkIssue() async {
     final cleanId = issueId.trim().replaceAll('#', '');
     if (cleanId.isEmpty) return;
+
+    // Client-side throttling: prevent requests more than once every 2 seconds
+    final now = DateTime.now();
+    if (lastCheckTime != null && now.difference(lastCheckTime!) < const Duration(seconds: 2)) {
+      return;
+    }
+    lastCheckTime = now;
 
     setState(() {
       isLoading = true;
@@ -36,6 +44,16 @@ class HomeState extends State<Home> {
       // Use GitHub Git matching-refs API to find all branches matching triage-issue-<ISSUE_ID>*
       final url = Uri.parse('https://api.github.com/repos/mboetger/flutter/git/matching-refs/heads/triage-issue-$cleanId');
       final response = await http.get(url);
+
+      // Check if GitHub's IP-based rate limit has been exceeded (403/429)
+      if (response.statusCode == 403 || response.statusCode == 429) {
+        setState(() {
+          isLoading = false;
+          status = 'RateLimited';
+          matchingBranches = [];
+        });
+        return;
+      }
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -184,6 +202,30 @@ class HomeState extends State<Home> {
                 ),
               ]),
             ]),
+        ])
+      else if (status == 'RateLimited')
+        div(classes: 'result-container', [
+          div(classes: 'result-card result-error', [
+            div(classes: 'result-icon', [
+              .element(tag: 'svg', attributes: {
+                'xmlns': 'http://www.w3.org/2000/svg',
+                'viewBox': '0 0 24 24',
+                'fill': 'none',
+                'stroke': 'currentColor',
+                'stroke-width': '2',
+                'stroke-linecap': 'round',
+                'stroke-linejoin': 'round',
+              }, children: [
+                .element(tag: 'circle', attributes: {'cx': '12', 'cy': '12', 'r': '10'}, children: []),
+                .element(tag: 'line', attributes: {'x1': '12', 'y1': '8', 'x2': '12', 'y2': '12'}, children: []),
+                .element(tag: 'line', attributes: {'x1': '12', 'y1': '16', 'x2': '12.01', 'y2': '16'}, children: []),
+              ]),
+            ]),
+            div(classes: 'result-content', [
+              h3(classes: 'result-title', [.text('Rate Limit Exceeded')]),
+              p(classes: 'result-desc', [.text('You have exceeded GitHub\'s API rate limit (60 requests/hour per IP). Please wait a while before trying again.')]),
+            ]),
+          ]),
         ])
       else if (status == 'Not triaged')
         div(classes: 'result-container', [
