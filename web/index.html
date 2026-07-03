@@ -16,6 +16,15 @@
         <!-- Loads and runs the compiled 'main.client.dart' file. -->
         <!-- Can be changed to any other '.client.dart' file inside /lib. -->
         <script defer src="main.client.dart.js"></script>
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-771YHGKHSS"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', 'G-771YHGKHSS');
+        </script>
     </head>
     <body>
         <!-- Your app component will be inserted here. -->
