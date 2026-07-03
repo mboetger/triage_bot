@@ -24,6 +24,8 @@ class HomeState extends State<Home> {
   String status = '';
   List<BranchInfo> matchingBranches = [];
   DateTime? lastCheckTime;
+  int? totalTriageIssues;
+  List<String> last20Issues = [];
 
   @override
   void initState() {
@@ -38,6 +40,39 @@ class HomeState extends State<Home> {
         }
       } catch (_) {}
     }
+    _fetchTotalTriageIssues();
+  }
+
+  Future<void> _fetchTotalTriageIssues() async {
+    try {
+      final url = Uri.parse('https://api.github.com/repos/mboetger/flutter/git/matching-refs/heads/triage-issue-');
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        int count = 0;
+        Set<int> issueNumbers = {};
+        for (final item in data) {
+          final ref = item['ref'] as String?;
+          if (ref != null && ref.startsWith('refs/heads/triage-issue-')) {
+            count++;
+            final match = RegExp(r'triage-issue-(\d+)').firstMatch(ref);
+            if (match != null) {
+              issueNumbers.add(int.parse(match.group(1)!));
+            }
+          }
+        }
+
+        final sortedIssues = issueNumbers.toList()..sort((a, b) => b.compareTo(a));
+        final top20 = sortedIssues.take(20).map((id) => id.toString()).toList();
+
+        if (mounted) {
+          setState(() {
+            totalTriageIssues = count;
+            last20Issues = top20;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> checkIssue() async {
@@ -282,6 +317,30 @@ class HomeState extends State<Home> {
         ])
       else
         .empty(),
+      if (last20Issues.isNotEmpty)
+        div(classes: 'recent-issues-container', [
+          h3(classes: 'recent-issues-title', [.text('Recently Triaged Issues')]),
+          if (totalTriageIssues != null)
+            div(classes: 'badge recent-badge', [.text('$totalTriageIssues total issues triaged')]),
+          div(classes: 'recent-issues-list', [
+            for (final id in last20Issues)
+              a(
+                href: '?issue=$id',
+                classes: 'recent-issue-chip',
+                events: {
+                  'click': (web.Event event) {
+                    event.preventDefault();
+                    web.window.history.pushState(null, '', '?issue=$id');
+                    setState(() => issueId = id);
+                    checkIssue();
+                  }
+                },
+                [
+                  .text('#$id'),
+                ],
+              ),
+          ]),
+        ]),
     ]);
   }
 }
