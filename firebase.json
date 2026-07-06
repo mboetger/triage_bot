@@ -11,8 +11,8 @@
       "firebase-debug.log",
       "firebase-debug.*.log",
       "*.local"
-    ], 
-    "runtime": "nodejs24"
+    ],
+    "predeploy": "npm --prefix functions run build"    
   },
   "hosting": {
     "public": "build/jaspr",
