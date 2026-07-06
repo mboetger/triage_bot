@@ -2,6 +2,7 @@ import 'package:jaspr/dom.dart';
 import 'package:jaspr/jaspr.dart';
 
 import 'pages/home.dart';
+import 'components/statistics.dart';
 
 // The main component of your application.
 class App extends StatelessComponent {
@@ -11,6 +12,7 @@ class App extends StatelessComponent {
   Component build(BuildContext context) {
     return div(classes: 'app-container', [
       const Home(),
+      const Statistics(),
     ]);
   }
 }
