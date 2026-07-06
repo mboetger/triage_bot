@@ -48,8 +48,8 @@ export const calculateDailyBranchStatistics = onSchedule('every 24 hours', async
                 if (!fileStats[filename]) {
                   fileStats[filename] = { changes: 0, branches: 0 };
                 }
-                fileStats[filename].changes += changes;
-                fileStats[filename].branches += 1;
+                fileStats[filename]!.changes += changes;
+                fileStats[filename]!.branches += 1;
               }
             }
             totalBranchesAnalyzed++;
