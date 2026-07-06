@@ -8,7 +8,7 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // Fetch daily branch statistics
-export const calculateDailyBranchStatistics = onSchedule('every 24 hours', async (event) => {
+export const calculateDailyBranchStatistics = onSchedule('every 12 hours', async (event) => {
   try {
     const url = 'https://api.github.com/repos/mboetger/flutter/git/matching-refs/heads/triage-issue-';
     const response = await axios.get(url);
