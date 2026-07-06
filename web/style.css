@@ -463,3 +463,56 @@ body {
 .stats-table tr:hover td {
   background: rgba(139, 92, 246, 0.1);
 }
+
+/* Statistics Details (Toggle) */
+.statistics-details {
+  width: 100%;
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.statistics-details > summary {
+  padding: 12px 24px;
+  cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+  color: #c4b5fd;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  user-select: none;
+  list-style: none;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.statistics-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.statistics-details > summary::before {
+  content: '▶';
+  display: inline-block;
+  margin-right: 10px;
+  font-size: 10px;
+  color: #a855f7;
+  transition: transform 0.3s ease;
+}
+
+.statistics-details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.statistics-details > summary:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: white;
+}
+
+.statistics-details[open] > .glass-card {
+  margin-top: 16px;
+}

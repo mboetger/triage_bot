@@ -12,7 +12,13 @@ class App extends StatelessComponent {
   Component build(BuildContext context) {
     return div(classes: 'app-container', [
       const Home(),
-      const Statistics(),
+      details(
+        classes: 'statistics-details',
+        [
+          summary([.text('Show Statistics')]),
+          const Statistics(),
+        ],
+      ),
     ]);
   }
 }

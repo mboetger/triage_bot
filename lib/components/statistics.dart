@@ -113,7 +113,7 @@ class _StatisticsState extends State<Statistics> {
       p(classes: 'subtitle', [.text('Based on ${statistics!.totalBranchesAnalyzed} triaged branches')]),
       
       div(classes: 'stats-container', [
-        h4(classes: 'stats-header', [.text('Most Changed Files')]),
+        h4(classes: 'stats-header', [.text('Files Changed in Most Branches')]),
         table(classes: 'stats-table', [
           thead([
             tr([
@@ -123,7 +123,7 @@ class _StatisticsState extends State<Statistics> {
             ])
           ]),
           tbody([
-            for (final file in statistics!.topFiles.take(10))
+            for (final file in (statistics!.topFiles.toList()..sort((a, b) => b.branches.compareTo(a.branches))).take(10))
               tr([
                 td([.text(file.filename)]),
                 td([.text(file.changes.toString())]),

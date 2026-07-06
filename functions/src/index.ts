@@ -61,7 +61,7 @@ export const calculateDailyBranchStatistics = onSchedule('every 12 hours', async
     }
 
     const sortedFiles = Object.entries(fileStats)
-      .sort((a, b) => b[1].changes - a[1].changes)
+      .sort((a, b) => b[1].branches - a[1].branches)
       .slice(0, 50); // top 50 files
 
     await db.collection('statistics').doc('daily').set({
