@@ -32,3 +32,10 @@ migrate_working_dir/
 # Flutter related
 .flutter-plugins
 .flutter-plugins-dependencies
+
+# Firebase Functions
+functions/lib/
+functions/node_modules/
+functions/.env
+firebase-debug.log
+firebase-debug.*.log
