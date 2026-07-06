@@ -1,17 +1,28 @@
 import * as admin from 'firebase-admin';
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { defineSecret } from 'firebase-functions/params';
 import axios from 'axios';
+
+const githubToken = defineSecret('GITHUB_TOKEN');
 
 admin.initializeApp();
 
 const db = admin.firestore();
 
 // Fetch daily branch statistics
-export const calculateDailyBranchStatistics = onSchedule('every 12 hours', async (event) => {
-  try {
-    const url = 'https://api.github.com/repos/mboetger/flutter/git/matching-refs/heads/triage-issue-';
-    const response = await axios.get(url);
+export const calculateDailyBranchStatistics = onSchedule(
+  {
+    schedule: 'every 12 hours',
+    secrets: [githubToken],
+  },
+  async (event) => {
+    try {
+      const token = githubToken.value();
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
+      const url = 'https://api.github.com/repos/mboetger/flutter/git/matching-refs/heads/triage-issue-';
+      const response = await axios.get(url, config);
     const data = response.data;
     
     const fileStats: Record<string, { changes: number, branches: number }> = {};
@@ -27,22 +38,27 @@ export const calculateDailyBranchStatistics = onSchedule('every 12 hours', async
           let baseSha = '';
           const compareUrl = `https://api.github.com/repos/flutter/flutter/compare/master...mboetger:${branchName}`;
           try {
-            const compareRes = await axios.get(compareUrl);
+            const compareRes = await axios.get(compareUrl, config);
             baseSha = compareRes.data.merge_base_commit.sha;
           } catch (e) {
             const compareUrlFallback = `https://api.github.com/repos/mboetger/flutter/compare/flutter:master...${branchName}`;
-            const compareResFallback = await axios.get(compareUrlFallback);
+            const compareResFallback = await axios.get(compareUrlFallback, config);
             baseSha = compareResFallback.data.merge_base_commit.sha;
           }
 
           if (baseSha) {
             const finalCompareUrl = `https://api.github.com/repos/mboetger/flutter/compare/${baseSha}...${branchName}`;
-            const diffRes = await axios.get(finalCompareUrl);
+            const diffRes = await axios.get(finalCompareUrl, config);
             
             const files = diffRes.data.files;
             if (files && Array.isArray(files)) {
               for (const file of files) {
                 const filename = file.filename;
+                
+                if (filename.includes('/test/') || filename.startsWith('test/') || filename.endsWith('_test.dart')) {
+                  continue;
+                }
+
                 const changes = file.changes;
                 
                 if (!fileStats[filename]) {

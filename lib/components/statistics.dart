@@ -123,7 +123,10 @@ class _StatisticsState extends State<Statistics> {
             ])
           ]),
           tbody([
-            for (final file in (statistics!.topFiles.toList()..sort((a, b) => b.branches.compareTo(a.branches))).take(10))
+            for (final file in (statistics!.topFiles
+                .where((f) => !f.filename.contains('/test/') && !f.filename.startsWith('test/') && !f.filename.endsWith('_test.dart'))
+                .toList()
+              ..sort((a, b) => b.branches.compareTo(a.branches))).take(10))
               tr([
                 td([.text(file.filename)]),
                 td([.text(file.changes.toString())]),
