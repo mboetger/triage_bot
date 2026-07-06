@@ -43,7 +43,7 @@ jobs:
           credentials_json: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
 
       - name: Deploy Functions and Firestore
-        run: npx firebase-tools deploy --only functions,firestore --project triagebot-85bec
+        run: npx firebase-tools deploy --only functions,firestore --project triagebot-85bec --force
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
