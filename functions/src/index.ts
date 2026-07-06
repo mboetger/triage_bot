@@ -19,7 +19,14 @@ export const calculateDailyBranchStatistics = onSchedule(
   async (event) => {
     try {
       const token = githubToken.value();
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      const config: any = {
+        headers: {
+          'Connection': 'close'
+        }
+      };
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
 
       const url = 'https://api.github.com/repos/mboetger/flutter/git/matching-refs/heads/triage-issue-';
       const response = await axios.get(url, config);
@@ -73,6 +80,9 @@ export const calculateDailyBranchStatistics = onSchedule(
         } catch (e) {
           console.error(`Error processing branch ${branchName}:`, e);
         }
+
+        // Delay between branches to prevent GitHub abuse rate limits / socket hang ups
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
 
