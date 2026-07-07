@@ -517,35 +517,94 @@ body {
   margin-top: 16px;
 }
 
-/* Branch Details in Stats Table */
-.branch-details summary {
+/* Modal Styles */
+.clickable-row {
   cursor: pointer;
-  color: #c4b5fd;
-  font-weight: 500;
-  display: inline-block;
+  transition: background-color 0.2s ease;
 }
-.branch-details summary:hover {
-  color: white;
-}
-.branch-links {
+
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-  padding: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.3s ease-out;
 }
+
+.modal-content {
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  padding: 30px;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.modal-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: white;
+  word-break: break-all;
+  margin-right: 15px;
+}
+
+.modal-close {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #c4b5fd;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.modal-close:hover {
+  background: rgba(244, 63, 94, 0.2);
+  color: #f43f5e;
+}
+
+.modal-branch-links {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 15px;
+  gap: 10px;
+}
+
 .branch-link {
   color: #a855f7;
   text-decoration: none;
-  font-size: 12px;
+  font-size: 14px;
   background: rgba(168, 85, 247, 0.15);
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
   transition: all 0.2s ease;
+  border: 1px solid rgba(168, 85, 247, 0.3);
 }
 .branch-link:hover {
   background: rgba(168, 85, 247, 0.3);
   color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.2);
 }

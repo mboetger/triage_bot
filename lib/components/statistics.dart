@@ -53,6 +53,7 @@ class _StatisticsState extends State<Statistics> {
   BranchStatistics? statistics;
   bool isLoading = true;
   String error = '';
+  FileStats? selectedFile;
 
   @override
   void initState() {
@@ -129,29 +130,70 @@ class _StatisticsState extends State<Statistics> {
                 .where((f) => !f.filename.contains('/test/') && !f.filename.startsWith('test/') && !f.filename.endsWith('_test.dart'))
                 .toList()
               ..sort((a, b) => b.branches.compareTo(a.branches))).take(10))
-              tr([
-                td([.text(file.filename)]),
-                td([.text(file.changes.toString())]),
-                td([
-                  details(
-                    classes: 'branch-details',
-                    [
-                      summary([.text(file.branches.toString())]),
-                      div(classes: 'branch-links', [
-                        for (final branch in file.branchNames)
-                          a(
-                            href: '?issue=${branch.replaceAll('triage-issue-', '')}',
-                            classes: 'branch-link',
-                            [.text('#${branch.replaceAll('triage-issue-', '')}')]
-                          )
-                      ])
-                    ]
-                  )
-                ]),
-              ])
+              tr(
+                classes: 'clickable-row',
+                events: {
+                  'click': (e) {
+                    setState(() {
+                      selectedFile = file;
+                    });
+                  }
+                },
+                [
+                  td([.text(file.filename)]),
+                  td([.text(file.changes.toString())]),
+                  td([.text(file.branches.toString())]),
+                ]
+              )
           ])
         ])
-      ])
+      ]),
+      if (selectedFile != null)
+        div(
+          classes: 'modal-backdrop',
+          events: {
+            'click': (e) {
+              setState(() {
+                selectedFile = null;
+              });
+            }
+          },
+          [
+            div(
+              classes: 'modal-content glass-card',
+              events: {
+                'click': (e) {
+                  // Prevent clicks inside the modal from closing it
+                  e.stopPropagation();
+                }
+              },
+              [
+                div(classes: 'modal-header', [
+                  h3(classes: 'modal-title', [.text('Branches for ${selectedFile!.filename}')]),
+                  button(
+                    classes: 'modal-close',
+                    events: {
+                      'click': (e) {
+                        setState(() {
+                          selectedFile = null;
+                        });
+                      }
+                    },
+                    [.text('✕')]
+                  )
+                ]),
+                div(classes: 'branch-links modal-branch-links', [
+                  for (final branch in selectedFile!.branchNames)
+                    a(
+                      href: '?issue=${branch.replaceAll('triage-issue-', '')}',
+                      classes: 'branch-link',
+                      [.text('#${branch.replaceAll('triage-issue-', '')}')]
+                    )
+                ])
+              ]
+            )
+          ]
+        )
     ]);
   }
 }
