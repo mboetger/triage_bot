@@ -7,14 +7,16 @@ class FileStats {
   final String filename;
   final int changes;
   final int branches;
+  final List<String> branchNames;
   
-  FileStats({required this.filename, required this.changes, required this.branches});
+  FileStats({required this.filename, required this.changes, required this.branches, this.branchNames = const []});
   
   factory FileStats.fromJson(Map<String, dynamic> json) {
     return FileStats(
       filename: json['filename'] as String,
       changes: json['changes'] as int,
       branches: json['branches'] as int,
+      branchNames: (json['branchNames'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
     );
   }
 }
@@ -130,7 +132,22 @@ class _StatisticsState extends State<Statistics> {
               tr([
                 td([.text(file.filename)]),
                 td([.text(file.changes.toString())]),
-                td([.text(file.branches.toString())]),
+                td([
+                  details(
+                    classes: 'branch-details',
+                    [
+                      summary([.text(file.branches.toString())]),
+                      div(classes: 'branch-links', [
+                        for (final branch in file.branchNames)
+                          a(
+                            href: '?issue=${branch.replaceAll('triage-issue-', '')}',
+                            classes: 'branch-link',
+                            [.text('#${branch.replaceAll('triage-issue-', '')}')]
+                          )
+                      ])
+                    ]
+                  )
+                ]),
               ])
           ])
         ])

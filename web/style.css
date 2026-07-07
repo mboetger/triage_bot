@@ -516,3 +516,36 @@ body {
 .statistics-details[open] > .glass-card {
   margin-top: 16px;
 }
+
+/* Branch Details in Stats Table */
+.branch-details summary {
+  cursor: pointer;
+  color: #c4b5fd;
+  font-weight: 500;
+  display: inline-block;
+}
+.branch-details summary:hover {
+  color: white;
+}
+.branch-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+.branch-link {
+  color: #a855f7;
+  text-decoration: none;
+  font-size: 12px;
+  background: rgba(168, 85, 247, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+.branch-link:hover {
+  background: rgba(168, 85, 247, 0.3);
+  color: white;
+}
