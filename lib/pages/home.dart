@@ -267,7 +267,7 @@ class HomeState extends State<Home> {
           ]),
         ]),
         h1(classes: 'title', [.text('Triage Verifier')]),
-        p(classes: 'subtitle', [.text('Check if a GitHub issue has been triaged in mboetger/flutter or mboetger/packages')]),
+        p(classes: 'subtitle', [.text('Check if a GitHub issue has been LLM-assisted triaged in mboetger/flutter or mboetger/packages')]),
       ]),
       form(
         classes: 'form-group',
