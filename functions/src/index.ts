@@ -9,6 +9,31 @@ const githubToken = defineSecret('GITHUB_TOKEN');
 admin.initializeApp();
 const db = admin.firestore();
 
+interface RepoTarget {
+  owner: string;
+  repo: string;
+  upstreamOwner: string;
+  upstreamRepo: string;
+  upstreamBranch: string;
+}
+
+const targetRepositories: RepoTarget[] = [
+  {
+    owner: 'mboetger',
+    repo: 'flutter',
+    upstreamOwner: 'flutter',
+    upstreamRepo: 'flutter',
+    upstreamBranch: 'master',
+  },
+  {
+    owner: 'mboetger',
+    repo: 'packages',
+    upstreamOwner: 'flutter',
+    upstreamRepo: 'packages',
+    upstreamBranch: 'main',
+  },
+];
+
 export const calculateDailyBranchStatistics = onSchedule(
   {
     schedule: 'every 15 minutes',
@@ -26,16 +51,36 @@ export const calculateDailyBranchStatistics = onSchedule(
         config.headers['Authorization'] = `Bearer ${token}`;
       }
 
-      // 1. Fetch all triage branches from GitHub
-      const url = 'https://api.github.com/repos/mboetger/flutter/git/matching-refs/heads/triage-issue-';
-      const response = await axios.get(url, config);
-      const data = response.data;
-      
-      const githubBranches = new Set<string>();
-      for (const item of data) {
-        const ref = item.ref as string;
-        if (ref && ref.startsWith('refs/heads/')) {
-          githubBranches.add(ref.substring('refs/heads/'.length));
+      // 1. Fetch all triage branches from GitHub for each repository
+      interface BranchEntry {
+        docId: string;
+        branchName: string;
+        target: RepoTarget;
+      }
+
+      const githubBranches = new Map<string, BranchEntry>();
+
+      for (const target of targetRepositories) {
+        try {
+          const url = `https://api.github.com/repos/${target.owner}/${target.repo}/git/matching-refs/heads/triage-issue-`;
+          const response = await axios.get(url, config);
+          const data = response.data;
+          if (Array.isArray(data)) {
+            for (const item of data) {
+              const ref = item.ref as string;
+              if (ref && ref.startsWith('refs/heads/')) {
+                const branchName = ref.substring('refs/heads/'.length);
+                const docId = target.repo === 'flutter' ? branchName : `${target.repo}:${branchName}`;
+                githubBranches.set(docId, {
+                  docId,
+                  branchName,
+                  target,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`Error fetching branches for ${target.owner}/${target.repo}:`, e);
         }
       }
 
@@ -47,15 +92,15 @@ export const calculateDailyBranchStatistics = onSchedule(
       const batch = db.batch();
 
       for (const doc of branchStatsSnap.docs) {
-        const branchName = doc.id;
+        const docId = doc.id;
         const lastCalculated = doc.get('lastCalculated');
         
-        if (!githubBranches.has(branchName)) {
+        if (!githubBranches.has(docId)) {
           // Branch no longer exists on GitHub, delete it
           batch.delete(doc.ref);
           branchesDeleted++;
         } else {
-          firestoreBranches.set(branchName, lastCalculated);
+          firestoreBranches.set(docId, lastCalculated);
         }
       }
 
@@ -68,11 +113,11 @@ export const calculateDailyBranchStatistics = onSchedule(
       const now = Date.now();
       const ONE_DAY_MS = 24 * 60 * 60 * 1000;
       
-      const toCalculate: string[] = [];
-      for (const branchName of githubBranches) {
-        const lastCalculated = firestoreBranches.get(branchName);
+      const toCalculate: BranchEntry[] = [];
+      for (const [docId, entry] of githubBranches) {
+        const lastCalculated = firestoreBranches.get(docId);
         if (!lastCalculated || (now - lastCalculated.toMillis() > ONE_DAY_MS)) {
-          toCalculate.push(branchName);
+          toCalculate.push(entry);
         }
       }
 
@@ -85,21 +130,22 @@ export const calculateDailyBranchStatistics = onSchedule(
       const branchesToProcess = toCalculate.slice(0, 10);
       let branchesUpdated = 0;
 
-      for (const branchName of branchesToProcess) {
+      for (const entry of branchesToProcess) {
+        const { docId, branchName, target } = entry;
         try {
           let baseSha = '';
-          const compareUrl = `https://api.github.com/repos/flutter/flutter/compare/master...mboetger:${branchName}`;
+          const compareUrl = `https://api.github.com/repos/${target.upstreamOwner}/${target.upstreamRepo}/compare/${target.upstreamBranch}...${target.owner}:${branchName}`;
           try {
             const compareRes = await axios.get(compareUrl, config);
             baseSha = compareRes.data.merge_base_commit.sha;
           } catch (e) {
-            const compareUrlFallback = `https://api.github.com/repos/mboetger/flutter/compare/flutter:master...${branchName}`;
+            const compareUrlFallback = `https://api.github.com/repos/${target.owner}/${target.repo}/compare/${target.upstreamOwner}:${target.upstreamBranch}...${branchName}`;
             const compareResFallback = await axios.get(compareUrlFallback, config);
             baseSha = compareResFallback.data.merge_base_commit.sha;
           }
 
           if (baseSha) {
-            const finalCompareUrl = `https://api.github.com/repos/mboetger/flutter/compare/${baseSha}...${branchName}`;
+            const finalCompareUrl = `https://api.github.com/repos/${target.owner}/${target.repo}/compare/${baseSha}...${branchName}`;
             const diffRes = await axios.get(finalCompareUrl, config);
             
             const files = diffRes.data.files;
@@ -115,14 +161,16 @@ export const calculateDailyBranchStatistics = onSchedule(
               }
             }
             
-            await db.collection('branch_stats').doc(branchName).set({
+            await db.collection('branch_stats').doc(docId).set({
               lastCalculated: admin.firestore.FieldValue.serverTimestamp(),
-              files: branchFiles
+              files: branchFiles,
+              repository: `${target.owner}/${target.repo}`,
+              branchName: branchName,
             });
             branchesUpdated++;
           }
         } catch (e) {
-          console.error(`Error processing branch ${branchName}:`, e);
+          console.error(`Error processing branch ${branchName} in ${target.owner}/${target.repo}:`, e);
         }
         
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -136,7 +184,8 @@ export const calculateDailyBranchStatistics = onSchedule(
         const globalFileStats: Record<string, { changes: number, branches: number, branchNames: string[] }> = {};
         
         for (const doc of allStatsSnap.docs) {
-          const branchName = doc.id;
+          const docId = doc.id;
+          const cleanBranchName = doc.get('branchName') || docId.replace(/^packages:/, '');
           const files = doc.get('files') || {};
           for (const [filename, fileData] of Object.entries<any>(files)) {
             if (!globalFileStats[filename]) {
@@ -144,7 +193,7 @@ export const calculateDailyBranchStatistics = onSchedule(
             }
             globalFileStats[filename].changes += fileData.changes || 0;
             globalFileStats[filename].branches += 1;
-            globalFileStats[filename].branchNames.push(branchName);
+            globalFileStats[filename].branchNames.push(cleanBranchName);
           }
         }
 

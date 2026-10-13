@@ -1,14 +1,14 @@
 # Triage Bot
 
-A high-performance, single-page Jaspr web application designed to instantly verify the triage status of GitHub issues in the `mboetger/flutter` repository.
+A high-performance, single-page Jaspr web application designed to instantly verify the triage status of GitHub issues in the `mboetger/flutter` and `mboetger/packages` repositories.
 
 ## Features
 
-- **Dynamic Branch Resolution**: Instantly queries the GitHub Git database (`matching-refs` API) to find all branches starting with `triage-issue-<ISSUE_ID>` (such as `triage-issue-123`, `triage-issue-123-2`, etc.).
-- **Drift-Free Commit Comparison**: Calculates the exact merge base commit SHA against upstream `flutter/flutter:master` to prevent branch drift from stale fork branches. It generates a pristine compare page (`<base_sha>...<branch>`) displaying only the commits added to the triage branch.
-- **Explicit Navigation**: Displays beautiful result cards with direct links to launch the pristine commit comparison page in a new window (`target="_blank"`).
+- **Dynamic Branch Resolution**: Instantly queries the GitHub Git database (`matching-refs` API) to find all branches starting with `triage-issue-<ISSUE_ID>` (such as `triage-issue-123`, `triage-issue-123-2`, etc.) across `mboetger/flutter` and `mboetger/packages`.
+- **Drift-Free Commit Comparison**: Calculates the exact merge base commit SHA against upstream repositories (`flutter/flutter:master` and `flutter/packages:main`) to prevent branch drift from stale fork branches. It generates a pristine compare page (`<base_sha>...<branch>`) displaying only the commits added to the triage branch.
+- **Explicit Navigation**: Displays beautiful result cards indicating the source repository with direct links to launch the pristine commit comparison page in a new window (`target="_blank"`).
 - **Premium Aesthetics**: Built with a rich, glassmorphic dark mode UI, smooth gradient accents, micro-animations, and modern typography (`Outfit` and `Inter` from Google Fonts).
-- **Firebase Backend**: A scheduled Cloud Function automatically processes triage branches daily, diffs them against `master` to track file modifications, and aggregates repository-wide analytics into a secure, internet-isolated Firestore database. The frontend fetches this live data via a serverless HTTPS endpoint to display top changed files and branch volume statistics.
+- **Firebase Backend**: A scheduled Cloud Function automatically processes triage branches daily across both repositories, diffs them against upstream to track file modifications, and aggregates repository-wide analytics into a secure, internet-isolated Firestore database. The frontend fetches this live data via a serverless HTTPS endpoint to display top changed files and branch volume statistics.
 
 ## Running the Project
 

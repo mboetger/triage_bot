@@ -135,7 +135,7 @@ class _StatisticsState extends State<Statistics> {
                               !f.filename.endsWith('_test.dart'),
                         )
                         .toList()
-                      ..sort((a, b) => b.branches.compareTo(a.branches)))
+                      ..sort((f1, f2) => f2.branches.compareTo(f1.branches)))
                     .take(10))
               tr([
                 td([.text(file.filename)]),

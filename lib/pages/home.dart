@@ -5,10 +5,51 @@ import 'package:jaspr/jaspr.dart';
 import 'package:universal_web/web.dart' as web;
 
 class BranchInfo {
-  BranchInfo(this.name, this.compareUrl);
+  BranchInfo({
+    required this.name,
+    required this.compareUrl,
+    required this.repository,
+  });
   final String name;
   final String compareUrl;
+  final String repository;
 }
+
+class RepoTarget {
+  const RepoTarget({
+    required this.owner,
+    required this.repo,
+    required this.upstreamOwner,
+    required this.upstreamRepo,
+    required this.upstreamBranch,
+  });
+
+  final String owner;
+  final String repo;
+  final String upstreamOwner;
+  final String upstreamRepo;
+  final String upstreamBranch;
+
+  String get fullName => '$owner/$repo';
+  String get upstreamFullName => '$upstreamOwner/$upstreamRepo';
+}
+
+const targetRepositories = [
+  RepoTarget(
+    owner: 'mboetger',
+    repo: 'flutter',
+    upstreamOwner: 'flutter',
+    upstreamRepo: 'flutter',
+    upstreamBranch: 'master',
+  ),
+  RepoTarget(
+    owner: 'mboetger',
+    repo: 'packages',
+    upstreamOwner: 'flutter',
+    upstreamRepo: 'packages',
+    upstreamBranch: 'main',
+  ),
+];
 
 class Home extends StatefulComponent {
   const Home({super.key});
@@ -45,32 +86,41 @@ class HomeState extends State<Home> {
 
   Future<void> _fetchTotalTriageIssues() async {
     try {
-      final url = Uri.parse('https://api.github.com/repos/mboetger/flutter/git/matching-refs/heads/triage-issue-');
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        int count = 0;
-        Set<int> issueNumbers = {};
-        for (final item in data) {
-          final ref = item['ref'] as String?;
-          if (ref != null && ref.startsWith('refs/heads/triage-issue-')) {
-            count++;
-            final match = RegExp(r'triage-issue-(\d+)').firstMatch(ref);
-            if (match != null) {
-              issueNumbers.add(int.parse(match.group(1)!));
+      int count = 0;
+      final Set<int> issueNumbers = {};
+
+      final responses = await Future.wait(
+        targetRepositories.map(
+          (target) => http.get(
+            Uri.parse('https://api.github.com/repos/${target.fullName}/git/matching-refs/heads/triage-issue-'),
+          ),
+        ),
+      );
+
+      for (final response in responses) {
+        if (response.statusCode == 200) {
+          final List<dynamic> data = jsonDecode(response.body);
+          for (final item in data) {
+            final ref = item['ref'] as String?;
+            if (ref != null && ref.startsWith('refs/heads/triage-issue-')) {
+              count++;
+              final match = RegExp(r'triage-issue-(\d+)').firstMatch(ref);
+              if (match != null) {
+                issueNumbers.add(int.parse(match.group(1)!));
+              }
             }
           }
         }
+      }
 
-        final sortedIssues = issueNumbers.toList()..sort((a, b) => b.compareTo(a));
-        final top20 = sortedIssues.take(20).map((id) => id.toString()).toList();
+      final sortedIssues = issueNumbers.toList()..sort((first, second) => second.compareTo(first));
+      final top20 = sortedIssues.take(20).map((id) => id.toString()).toList();
 
-        if (mounted) {
-          setState(() {
-            totalTriageIssues = count;
-            last20Issues = top20;
-          });
-        }
+      if (mounted) {
+        setState(() {
+          totalTriageIssues = count;
+          last20Issues = top20;
+        });
       }
     } catch (_) {}
   }
@@ -94,12 +144,77 @@ class HomeState extends State<Home> {
     });
 
     try {
-      // Use GitHub Git matching-refs API to find all branches matching triage-issue-<ISSUE_ID>*
-      final url = Uri.parse('https://api.github.com/repos/mboetger/flutter/git/matching-refs/heads/triage-issue-$cleanId');
-      final response = await http.get(url);
+      bool isRateLimited = false;
+      final branchInfos = <BranchInfo>[];
 
-      // Check if GitHub's IP-based rate limit has been exceeded (403/429)
-      if (response.statusCode == 403 || response.statusCode == 429) {
+      // Query all target repositories in parallel
+      final repoResponses = await Future.wait(
+        targetRepositories.map((target) async {
+          final url = Uri.parse(
+            'https://api.github.com/repos/${target.fullName}/git/matching-refs/heads/triage-issue-$cleanId',
+          );
+          final response = await http.get(url);
+          return (target: target, response: response);
+        }),
+      );
+
+      for (final item in repoResponses) {
+        final target = item.target;
+        final response = item.response;
+
+        if (response.statusCode == 403 || response.statusCode == 429) {
+          isRateLimited = true;
+          continue;
+        }
+
+        if (response.statusCode == 200) {
+          final List<dynamic> data = jsonDecode(response.body);
+          for (final refItem in data) {
+            final ref = refItem['ref'] as String?;
+            if (ref != null && ref.startsWith('refs/heads/')) {
+              final branchName = ref.substring('refs/heads/'.length);
+
+              // Fetch the merge base commit SHA against upstream repo
+              // (e.g. flutter/flutter:master or flutter/packages:main)
+              // because mboetger fork branches may be far behind upstream.
+              String baseSha = '';
+              try {
+                final compareUrl = Uri.parse(
+                  'https://api.github.com/repos/${target.upstreamFullName}/compare/${target.upstreamBranch}...${target.owner}:$branchName',
+                );
+                final compareRes = await http.get(compareUrl);
+                if (compareRes.statusCode == 200) {
+                  final compareData = jsonDecode(compareRes.body);
+                  baseSha = compareData['merge_base_commit']['sha'] as String;
+                } else {
+                  final compareUrlFallback = Uri.parse(
+                    'https://api.github.com/repos/${target.fullName}/compare/${target.upstreamOwner}:${target.upstreamBranch}...$branchName',
+                  );
+                  final compareResFallback = await http.get(compareUrlFallback);
+                  if (compareResFallback.statusCode == 200) {
+                    final compareDataFallback = jsonDecode(compareResFallback.body);
+                    baseSha = compareDataFallback['merge_base_commit']['sha'] as String;
+                  }
+                }
+              } catch (_) {}
+
+              final finalCompareUrl = baseSha.isNotEmpty
+                  ? 'https://github.com/${target.fullName}/compare/$baseSha...$branchName'
+                  : 'https://github.com/${target.fullName}/compare/$branchName';
+
+              branchInfos.add(
+                BranchInfo(
+                  name: branchName,
+                  compareUrl: finalCompareUrl,
+                  repository: target.fullName,
+                ),
+              );
+            }
+          }
+        }
+      }
+
+      if (isRateLimited && branchInfos.isEmpty) {
         setState(() {
           isLoading = false;
           status = 'RateLimited';
@@ -108,55 +223,12 @@ class HomeState extends State<Home> {
         return;
       }
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        final branchInfos = <BranchInfo>[];
-
-        for (final item in data) {
-          final ref = item['ref'] as String?;
-          if (ref != null && ref.startsWith('refs/heads/')) {
-            final branchName = ref.substring('refs/heads/'.length);
-
-            // Fetch the merge base commit SHA against upstream flutter/flutter:master
-            // because mboetger/flutter:master may be thousands of commits behind upstream.
-            String baseSha = '';
-            try {
-              final compareUrl = Uri.parse('https://api.github.com/repos/flutter/flutter/compare/master...mboetger:$branchName');
-              final compareRes = await http.get(compareUrl);
-              if (compareRes.statusCode == 200) {
-                final compareData = jsonDecode(compareRes.body);
-                baseSha = compareData['merge_base_commit']['sha'] as String;
-              } else {
-                final compareUrlFallback = Uri.parse('https://api.github.com/repos/mboetger/flutter/compare/flutter:master...$branchName');
-                final compareResFallback = await http.get(compareUrlFallback);
-                if (compareResFallback.statusCode == 200) {
-                  final compareDataFallback = jsonDecode(compareResFallback.body);
-                  baseSha = compareDataFallback['merge_base_commit']['sha'] as String;
-                }
-              }
-            } catch (_) {}
-
-            final finalCompareUrl = baseSha.isNotEmpty
-                ? 'https://github.com/mboetger/flutter/compare/$baseSha...$branchName'
-                : 'https://github.com/mboetger/flutter/compare/$branchName';
-
-            branchInfos.add(BranchInfo(branchName, finalCompareUrl));
-          }
-        }
-
-        if (branchInfos.isNotEmpty) {
-          setState(() {
-            isLoading = false;
-            status = 'Found';
-            matchingBranches = branchInfos;
-          });
-        } else {
-          setState(() {
-            isLoading = false;
-            status = 'Not triaged';
-            matchingBranches = [];
-          });
-        }
+      if (branchInfos.isNotEmpty) {
+        setState(() {
+          isLoading = false;
+          status = 'Found';
+          matchingBranches = branchInfos;
+        });
       } else {
         setState(() {
           isLoading = false;
@@ -195,7 +267,7 @@ class HomeState extends State<Home> {
           ]),
         ]),
         h1(classes: 'title', [.text('Triage Verifier')]),
-        p(classes: 'subtitle', [.text('Check if a GitHub issue has been triaged in mboetger/flutter')]),
+        p(classes: 'subtitle', [.text('Check if a GitHub issue has been triaged in mboetger/flutter or mboetger/packages')]),
       ]),
       form(
         classes: 'form-group',
@@ -254,7 +326,7 @@ class HomeState extends State<Home> {
               div(classes: 'result-content', [
                 h3(classes: 'result-title', [.text(branch.name)]),
                 p(classes: 'result-desc', [
-                  .text('Branch found! Click below to view the commit comparison.')
+                  .text('Branch found in ${branch.repository}! Click below to view the commit comparison.')
                 ]),
                 a(
                   href: branch.compareUrl,
@@ -311,7 +383,7 @@ class HomeState extends State<Home> {
             ]),
             div(classes: 'result-content', [
               h3(classes: 'result-title', [.text('Not triaged')]),
-              p(classes: 'result-desc', [.text('No branch starting with "triage-issue-$searchedIssueId" was found in mboetger/flutter.')]),
+              p(classes: 'result-desc', [.text('No branch starting with "triage-issue-$searchedIssueId" was found in mboetger/flutter or mboetger/packages.')]),
             ]),
           ]),
         ])
