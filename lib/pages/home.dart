@@ -78,6 +78,7 @@ class HomeState extends State<Home> {
         final param = uri.queryParameters['issue'] ?? uri.queryParameters['id'];
         if (param != null && param.isNotEmpty) {
           issueId = param;
+          Future.microtask(() => checkIssue());
         }
       } catch (_) {}
     }
@@ -86,7 +87,6 @@ class HomeState extends State<Home> {
 
   Future<void> _fetchTotalTriageIssues() async {
     try {
-      int count = 0;
       final Set<int> issueNumbers = {};
 
       final responses = await Future.wait(
@@ -103,7 +103,6 @@ class HomeState extends State<Home> {
           for (final item in data) {
             final ref = item['ref'] as String?;
             if (ref != null && ref.startsWith('refs/heads/triage-issue-')) {
-              count++;
               final match = RegExp(r'triage-issue-(\d+)').firstMatch(ref);
               if (match != null) {
                 issueNumbers.add(int.parse(match.group(1)!));
@@ -118,7 +117,7 @@ class HomeState extends State<Home> {
 
       if (mounted) {
         setState(() {
-          totalTriageIssues = count;
+          totalTriageIssues = issueNumbers.length;
           last20Issues = top20;
         });
       }
@@ -158,6 +157,8 @@ class HomeState extends State<Home> {
         }),
       );
 
+      final branchTasks = <Future<BranchInfo?>>[];
+
       for (final item in repoResponses) {
         final target = item.target;
         final response = item.response;
@@ -174,43 +175,67 @@ class HomeState extends State<Home> {
             if (ref != null && ref.startsWith('refs/heads/')) {
               final branchName = ref.substring('refs/heads/'.length);
 
-              // Fetch the merge base commit SHA against upstream repo
-              // (e.g. flutter/flutter:master or flutter/packages:main)
-              // because mboetger fork branches may be far behind upstream.
-              String baseSha = '';
-              try {
-                final compareUrl = Uri.parse(
-                  'https://api.github.com/repos/${target.upstreamFullName}/compare/${target.upstreamBranch}...${target.owner}:$branchName',
-                );
-                final compareRes = await http.get(compareUrl);
-                if (compareRes.statusCode == 200) {
-                  final compareData = jsonDecode(compareRes.body);
-                  baseSha = compareData['merge_base_commit']['sha'] as String;
-                } else {
-                  final compareUrlFallback = Uri.parse(
-                    'https://api.github.com/repos/${target.fullName}/compare/${target.upstreamOwner}:${target.upstreamBranch}...$branchName',
+              branchTasks.add(() async {
+                String baseSha = '';
+                int? aheadBy;
+                int? totalCommits;
+
+                // Fetch the merge base commit SHA against upstream repo
+                // (e.g. flutter/flutter:master or flutter/packages:main)
+                // because mboetger fork branches may be far behind upstream.
+                try {
+                  final compareUrl = Uri.parse(
+                    'https://api.github.com/repos/${target.upstreamFullName}/compare/${target.upstreamBranch}...${target.owner}:$branchName',
                   );
-                  final compareResFallback = await http.get(compareUrlFallback);
-                  if (compareResFallback.statusCode == 200) {
-                    final compareDataFallback = jsonDecode(compareResFallback.body);
-                    baseSha = compareDataFallback['merge_base_commit']['sha'] as String;
+                  final compareRes = await http.get(compareUrl);
+                  if (compareRes.statusCode == 200) {
+                    final compareData = jsonDecode(compareRes.body) as Map<String, dynamic>;
+                    baseSha = compareData['merge_base_commit']?['sha'] as String? ?? '';
+                    aheadBy = (compareData['ahead_by'] as num?)?.toInt();
+                    totalCommits = (compareData['total_commits'] as num?)?.toInt();
+                  } else if (compareRes.statusCode == 403 || compareRes.statusCode == 429) {
+                    isRateLimited = true;
+                  } else {
+                    final compareUrlFallback = Uri.parse(
+                      'https://api.github.com/repos/${target.fullName}/compare/${target.upstreamOwner}:${target.upstreamBranch}...$branchName',
+                    );
+                    final compareResFallback = await http.get(compareUrlFallback);
+                    if (compareResFallback.statusCode == 200) {
+                      final compareDataFallback = jsonDecode(compareResFallback.body) as Map<String, dynamic>;
+                      baseSha = compareDataFallback['merge_base_commit']?['sha'] as String? ?? '';
+                      aheadBy = (compareDataFallback['ahead_by'] as num?)?.toInt();
+                      totalCommits = (compareDataFallback['total_commits'] as num?)?.toInt();
+                    } else if (compareResFallback.statusCode == 403 || compareResFallback.statusCode == 429) {
+                      isRateLimited = true;
+                    }
                   }
+                } catch (_) {}
+
+                // If GitHub verified this branch has 0 commits ahead of upstream,
+                // it is not a triaged branch in this repository (e.g. an uncommitted/empty branch).
+                if ((aheadBy != null && aheadBy == 0) || (totalCommits != null && totalCommits == 0)) {
+                  return null;
                 }
-              } catch (_) {}
 
-              final finalCompareUrl = baseSha.isNotEmpty
-                  ? 'https://github.com/${target.fullName}/compare/$baseSha...$branchName'
-                  : 'https://github.com/${target.fullName}/compare/$branchName';
+                final finalCompareUrl = baseSha.isNotEmpty
+                    ? 'https://github.com/${target.fullName}/compare/$baseSha...$branchName'
+                    : 'https://github.com/${target.fullName}/compare/$branchName';
 
-              branchInfos.add(
-                BranchInfo(
+                return BranchInfo(
                   name: branchName,
                   compareUrl: finalCompareUrl,
                   repository: target.fullName,
-                ),
-              );
+                );
+              }());
             }
           }
+        }
+      }
+
+      final results = await Future.wait(branchTasks);
+      for (final result in results) {
+        if (result != null) {
+          branchInfos.add(result);
         }
       }
 
